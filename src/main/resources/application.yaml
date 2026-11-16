@@ -1,4 +1,5 @@
 server:
+  address: ${SERVER_ADDRESS:127.0.0.1}
   port: 9001
 
 spring:
@@ -16,6 +17,7 @@ spring:
 corocora:
   # REST API de Camunda en CB-BPM-Engine.
   engine-rest: ${ENGINE_REST_URL:http://localhost:9000/engine-rest}
+  taller-bodega: ${TALLER_BODEGA_URL:http://localhost:9005}
 
 ---
 # Perfil para correr sin PostgreSQL: --spring.profiles.active=h2
