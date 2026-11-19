@@ -1,6 +1,13 @@
 server:
   address: ${SERVER_ADDRESS:127.0.0.1}
   port: 9001
+  servlet:
+    session:
+      cookie:
+        # Las cookies de localhost se comparten entre puertos: cada portal usa su propio nombre.
+        name: CBSESSION_CLIENTE
+        same-site: lax
+        http-only: true
 
 spring:
   application:
@@ -13,11 +20,19 @@ spring:
     hibernate:
       ddl-auto: update
     open-in-view: false
+  jackson:
+    deserialization:
+      # Un kilometraje con decimales se rechaza con 400 en vez de truncarse en silencio.
+      accept-float-as-int: false
 
 corocora:
-  # REST API de Camunda en CB-BPM-Engine.
+  # Credencial con la que este portal se identifica ante el motor.
+  internal-token: ${COROCORA_INTERNAL_TOKEN:cb-local-interno-demo}
+  # REST API de Camunda en CB-BPM-Engine. Solo la usa el servidor, nunca el navegador.
   engine-rest: ${ENGINE_REST_URL:http://localhost:9000/engine-rest}
-  taller-bodega: ${TALLER_BODEGA_URL:http://localhost:9005}
+  portal:
+    # Activa la sesión de portal de cb-comun (/api/app/login, /me, CSRF).
+    habilitado: true
 
 ---
 # Perfil para correr sin PostgreSQL: --spring.profiles.active=h2

@@ -16,6 +16,16 @@
   <description>Portal web del cliente de postventa (puerto 9001)</description>
 
   <dependencies>
+    <!-- Credencial interna, cliente del motor, sesión de portal, auth.js y portal.css. -->
+    <dependency>
+      <groupId>com.corocorabenz</groupId>
+      <artifactId>cb-comun</artifactId>
+    </dependency>
+    <!-- En cb-comun es opcional: cada portal la declara para activar la sesión. -->
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-security</artifactId>
+    </dependency>
     <dependency>
       <groupId>org.springframework.boot</groupId>
       <artifactId>spring-boot-starter-web</artifactId>
@@ -41,6 +51,12 @@
       <groupId>com.h2database</groupId>
       <artifactId>h2</artifactId>
       <scope>runtime</scope>
+    </dependency>
+
+    <dependency>
+      <groupId>org.springframework.boot</groupId>
+      <artifactId>spring-boot-starter-test</artifactId>
+      <scope>test</scope>
     </dependency>
   </dependencies>
 

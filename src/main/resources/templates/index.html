@@ -1,6 +1,112 @@
-<!doctype html><html lang="es" xmlns:th="http://www.thymeleaf.org"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>Servicio · Corocora Benz</title><style>body{font:16px/1.5 system-ui;margin:0;background:#f3f6f8;color:#182634}header{background:#182634;color:white;padding:1rem max(1rem,calc((100% - 1050px)/2))}main{max-width:1050px;margin:auto;padding:2rem 1rem}section{background:white;border:1px solid #d5dfe5;border-radius:10px;padding:1.5rem;margin:1rem 0}form{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:1rem}label{display:grid;gap:.3rem;font-weight:600}input,select,textarea,button{font:inherit;padding:.65rem;border:1px solid #9aadb9;border-radius:5px}button{background:#075d72;color:white;border:0;cursor:pointer;min-height:44px}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid #d58c1d}.wide{grid-column:1/-1}li{padding:1rem;border-bottom:1px solid #ddd}#message{white-space:pre-wrap}</style></head><body><header><strong>Corocora Benz</strong> / Servicio al cliente</header><main><h1>Tu vehículo, en buenas manos</h1><p>Demostración: las cotizaciones y la disponibilidad de repuestos son simuladas. Consulta este portal para ver las novedades de tu caso.</p><p id="message" role="status" aria-live="polite"></p><section><h2>Nueva solicitud</h2><form id="request"><label>Nombre del cliente<input name="customerName" required maxlength="255"></label><label>Correo para notificaciones (opcional)<input name="customerEmail" type="email" maxlength="255"></label><label>VIN<input name="vin" required minlength="17" maxlength="17" pattern="[A-HJ-NPR-Z0-9]{17}" title="El VIN debe tener 17 caracteres en mayúscula, sin I, O ni Q"></label><label>Tipo de servicio<select name="serviceType"><option>Garantía</option><option>Mantenimiento</option><option>Reparación</option></select></label><label>Kilometraje<input name="mileageKm" type="number" min="0" required></label><label class="wide">Síntoma o necesidad<textarea name="symptom" required maxlength="255"></textarea></label><button>Enviar solicitud</button></form></section><section><h2>Mis solicitudes</h2><button id="lookup" type="button">Consultar mis solicitudes</button><ul id="cases"></ul></section></main><script th:inline="javascript">const engine=/*[[${engineRest}]]*/ 'http://localhost:9000/engine-rest';</script><script src="/auth.js"></script><script th:inline="none">
-const msg=document.querySelector('#message');function show(e){msg.textContent=typeof e==='string'?e:e.message||'No fue posible completar la operación.'}
-document.querySelector('#request').onsubmit=async e=>{e.preventDefault();const f=Object.fromEntries(new FormData(e.target));f.mileageKm=Number(f.mileageKm);const button=e.target.querySelector('button');button.disabled=true;try{const result=await CB.post('/client/requests',f);show('Solicitud enviada: '+result.businessKey);await load()}catch(err){show(err)}finally{button.disabled=false}};
-async function load(){const cases=await CB.request('/client/requests');const list=document.querySelector('#cases');list.replaceChildren();for(const pi of cases){const vals=pi.variables,activities=pi.activities;const finished=id=>activities.some(a=>a.activityId===id&&a.endTime);const active=id=>activities.some(a=>a.activityId===id&&!a.endTime);let state='Solicitud en curso';if(finished('closedEnd'))state='Vehículo entregado';else if(finished('quoteRejected'))state='Cotización rechazada; caso finalizado';else if(finished('quoteExpired'))state='Cotización vencida; caso finalizado';else if(pi.endTime)state='Caso finalizado';else if(active('deliverVehicle'))state='Pendiente de entrega';else if(active('attendWorkshop'))state='En atención de taller';else if(active('waitParts'))state='Esperando aviso de repuestos disponibles';else if(active('scheduleWorkshop'))state='Pendiente de agendar cita';else if(pi.canReply)state='Esperando respuesta a cotización';else if(active('reviewWarranty'))state='En revisión de garantía';else if(active('registerRequest'))state='Solicitud recibida';const li=document.createElement('li');li.textContent=pi.businessKey+' · '+state;const add=text=>{const p=document.createElement('p');p.textContent=text;li.append(p)};if(vals.appointmentDate)add('Cita: '+vals.appointmentDate);if(vals.serviceOrderId)add('Orden de taller: '+vals.serviceOrderId);if(vals.repairNotes&&finished('closedEnd'))add('Trabajo realizado: '+vals.repairNotes);if(vals.quoteId)add('Cotización '+vals.quoteId+': $'+Number(vals.quoteAmount).toLocaleString('es-CO')+' (simulada)');if(pi.canReply)for(const [label,action] of [['Aceptar','aceptar'],['Rechazar','rechazar']]){const button=document.createElement('button');button.textContent=label;button.onclick=async()=>{button.disabled=true;try{await CB.post('/client/requests/'+encodeURIComponent(pi.businessKey)+'/answer',{action});show('Respuesta enviada.');await load()}catch(e){show(e);button.disabled=false}};li.append(button)}list.append(li)}if(!list.children.length)list.textContent='No se encontraron solicitudes.'}
-document.querySelector('#lookup').onclick=()=>load().catch(show);window.addEventListener('cb-auth-ready',e=>{if(e.detail.cliente)load().catch(show)});
-</script></body></html>
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Servicio al cliente · Corocora Benz</title>
+  <link rel="stylesheet" href="/portal.css">
+</head>
+<body>
+  <header>
+    <strong>Corocora Benz</strong> / Servicio al cliente
+  </header>
+
+  <main>
+    <h1>Tu vehículo, en buenas manos</h1>
+    <p class="nota">
+      Demostración: las cotizaciones y la disponibilidad de repuestos son simuladas.
+      Consulta este portal para ver las novedades de tu caso.
+    </p>
+
+    <p id="message" role="status" aria-live="polite"></p>
+
+    <section aria-labelledby="titulo-nueva">
+      <h2 id="titulo-nueva">Nueva solicitud</h2>
+      <form id="request">
+        <label>
+          Nombre del cliente
+          <input name="customerName" value="Ana Pérez" required maxlength="255" autocomplete="name" placeholder="Ej.: Ana Pérez">
+        </label>
+
+        <label>
+          Correo para notificaciones (opcional)
+          <input name="customerEmail" type="email" maxlength="255" autocomplete="email" placeholder="Ej.: ana@correo.com">
+        </label>
+
+        <label>
+          VIN del vehículo
+          <input
+            name="vin"
+            value="CB0TEST0000000001"
+            required
+            minlength="17"
+            maxlength="17"
+            pattern="[A-HJ-NPR-Za-hj-npr-z0-9]{17}"
+            title="El VIN tiene 17 letras y números, sin I, O ni Q"
+            autocapitalize="characters"
+            spellcheck="false"
+            list="vin-de-prueba"
+            aria-describedby="ayuda-vin"
+            placeholder="CB0TEST0000000001">
+        </label>
+        <datalist id="vin-de-prueba">
+          <option value="CB0TEST0000000001" label="Con campaña activa"></option>
+          <option value="WDB0000000000000B" label="Sin campaña; garantía hasta 60 000 km"></option>
+        </datalist>
+
+        <label>
+          Tipo de servicio
+          <select name="serviceType" required>
+            <option selected>Garantía</option>
+            <option>Mantenimiento</option>
+            <option>Reparación</option>
+          </select>
+        </label>
+
+        <label>
+          Kilometraje
+          <input name="mileageKm" type="number" min="0" step="1" value="15000" required inputmode="numeric" placeholder="Ej.: 15000">
+        </label>
+
+        <label class="wide">
+          Síntoma o necesidad
+          <textarea
+            name="symptom"
+            required
+            maxlength="255"
+            placeholder="Ej.: La cámara de reversa no muestra imagen">La cámara de reversa no muestra imagen</textarea>
+        </label>
+
+        <p id="ayuda-vin" class="nota wide">
+          VIN de prueba: <code>CB0TEST0000000001</code> (con campaña activa) y
+          <code>WDB0000000000000B</code> (sin campaña: hasta 60 000 km lo cubre la garantía;
+          con más kilometraje queda fuera de garantía y recibe cotización).
+        </p>
+
+        <div class="acciones wide">
+          <button type="submit">Enviar solicitud</button>
+        </div>
+      </form>
+    </section>
+
+    <section aria-labelledby="titulo-solicitudes">
+      <h2 id="titulo-solicitudes">Mis solicitudes</h2>
+      <div class="acciones">
+        <button id="refresh" type="button" class="secundario">Actualizar</button>
+      </div>
+      <p id="empty" class="nota" hidden>Aún no tienes solicitudes. Crea la primera con el formulario de arriba.</p>
+      <ul id="cases" class="lista" aria-labelledby="titulo-solicitudes"></ul>
+    </section>
+  </main>
+
+  <script>
+    window.CB_PORTAL = {
+      nombre: "Servicio al cliente",
+      perfil: "cliente",
+      cuentas: "Cuentas de demostración: cliente1 o cliente2, con la contraseña demo."
+    };
+  </script>
+  <script src="/auth.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

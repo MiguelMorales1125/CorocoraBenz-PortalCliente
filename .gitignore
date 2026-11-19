@@ -1,0 +1,10 @@
+# Compilación
+target/
+
+# IDE
+.idea/
+*.iml
+.vscode/
+
+# Registros
+*.log
